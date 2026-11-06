@@ -1,11 +1,9 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
 import Catalog from './pages/Catalog.jsx'
 import FavoritesPage from './pages/FavoritesPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
-import CreateGunPage from './pages/CreateGunPage.jsx'
-import EditGunPage from './pages/EditGunPage.jsx'
 import GunDetail from './components/gun/GunDetail.jsx'
 import About from './pages/About.jsx'
 import Contact from './pages/Contact.jsx'
@@ -14,6 +12,24 @@ import ConfirmModal from './components/modals/ConfirmModal.jsx'
 import SplashScreen from './components/common/SplashScreen.jsx'
 import gunService from './services/gunService.js'
 import './App.css'
+
+// ---------------------------------------------------------------------------
+// Lazy Load — halaman berat hanya di-load saat pertama kali dibutuhkan.
+// Ini memecah bundle JS menjadi chunk terpisah (code splitting) sehingga
+// initial load lebih cepat karena tidak perlu download semua kode sekaligus.
+// ---------------------------------------------------------------------------
+const CreateGunPage = lazy(() => import('./pages/CreateGunPage.jsx'))
+const EditGunPage   = lazy(() => import('./pages/EditGunPage.jsx'))
+
+// Fallback ditampilkan selama chunk sedang di-download
+function PageLoader() {
+  return (
+    <div className="state-box" style={{ minHeight: '40vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="spin" style={{ width: 32, height: 32, border: '3px solid var(--line)', borderTopColor: 'var(--brass)', borderRadius: '50%' }} />
+      <p style={{ marginLeft: '1rem' }}>Loading…</p>
+    </div>
+  )
+}
 
 function App() {
   const [showSplash, setShowSplash] = useState(true)
@@ -67,26 +83,32 @@ function App() {
 
       <main className="main">
         {/* Sub-page views */}
+        {/* Suspense membungkus lazy-loaded page — menampilkan PageLoader
+             selama chunk JS sedang diunduh dari server */}
         {mode === 'create' && (
-          <CreateGunPage
-            onBack={handleBackToList}
-            onSuccess={() => {
-              handleBackToList()
-              setTab('Catalog')
-            }}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <CreateGunPage
+              onBack={handleBackToList}
+              onSuccess={() => {
+                handleBackToList()
+                setTab('Catalog')
+              }}
+            />
+          </Suspense>
         )}
 
         {mode === 'edit' && (
-          <EditGunPage
-            gun={editingGun}
-            gunId={editingGun?.id}
-            onBack={handleBackToList}
-            onSuccess={() => {
-              handleBackToList()
-              setTab('Catalog')
-            }}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <EditGunPage
+              gun={editingGun}
+              gunId={editingGun?.id}
+              onBack={handleBackToList}
+              onSuccess={() => {
+                handleBackToList()
+                setTab('Catalog')
+              }}
+            />
+          </Suspense>
         )}
 
         {mode === 'detail' && selectedGun && (

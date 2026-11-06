@@ -576,6 +576,58 @@
   padding: 0;
 }
 
+/* ---------------------------------------------------------------------------
+ * Pagination Controls
+ * --------------------------------------------------------------------------- */
+.pagination-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin: 32px 0 16px;
+}
+
+.pagination-info {
+  font-size: 0.85rem;
+  color: var(--steel);
+  margin: 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pagination .btn--sm {
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 0.85rem;
+  border-radius: 4px;
+}
+
+/* Halaman aktif: solid/primary */
+.pagination .btn--primary {
+  pointer-events: none; /* tidak bisa klik ulang halaman yang sudah aktif */
+}
+
+/* ---------------------------------------------------------------------------
+ * Share Button
+ * --------------------------------------------------------------------------- */
+.share-btn {
+  transition: all 0.2s ease;
+}
+
+/* Saat berhasil share/copy: tampil warna hijau */
+.share-btn--done {
+  color: #27ae60;
+  border-color: #27ae60;
+  background: #eafaf1;
+}
+
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

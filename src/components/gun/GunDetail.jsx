@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, Star, Send, Loader } from 'lucide-react'
+import { ArrowLeft, Star, Send, Loader, Share2, Check } from 'lucide-react'
 import FavoriteButton from '../common/FavoriteButton'
 import { useReviews, useCreateReview } from '../../hooks/useReviews'
 import { getUserIdentifier } from '../../services/userService'
@@ -30,6 +30,59 @@ export default function GunDetail({ gun, onBack, onEdit, onDelete }) {
 
   const avgRating = gun.average_rating || averageRating(reviews)
   const reviewCount = gun.review_count ?? reviews.length
+
+  // ---- Share Link ----
+  // shareStatus: '' | 'copied' | 'shared'
+  // Menggunakan Web Share API jika tersedia (PWA/mobile),
+  // fallback ke clipboard copy untuk browser desktop.
+  const [shareStatus, setShareStatus] = useState('')
+
+  const handleShare = async () => {
+    // Encode id produk sebagai query param agar link dapat dibagikan
+    const shareUrl = `${window.location.origin}/?product=${gun.id}`
+    const shareData = {
+      title: gun.name,
+      text: `Lihat ${gun.name} di Bore & Barrel — ${category}${caliber ? ` · ${caliber}` : ''} · ${formatPrice(price)}`,
+      url: shareUrl,
+    }
+
+    if (navigator.share) {
+      // Web Share API tersedia → buka dialog share native OS
+      try {
+        await navigator.share(shareData)
+        setShareStatus('shared')
+      } catch (err) {
+        // AbortError = user membatalkan — tidak perlu fallback
+        if (err.name !== 'AbortError') {
+          // Error lain → fallback ke clipboard
+          try {
+            await navigator.clipboard.writeText(shareUrl)
+            setShareStatus('copied')
+          } catch {
+            /* clipboard juga gagal — silent fail */
+          }
+        }
+      }
+    } else {
+      // Desktop tanpa Web Share API → langsung copy ke clipboard
+      try {
+        await navigator.clipboard.writeText(shareUrl)
+        setShareStatus('copied')
+      } catch {
+        /* clipboard tidak tersedia — silent fail */
+      }
+    }
+
+    // Reset feedback setelah 2 detik
+    if (shareStatus !== '') return
+    setTimeout(() => setShareStatus(''), 2000)
+  }
+
+  // Reset shareStatus setelah 2 detik setiap kali berubah
+  const triggerShare = async () => {
+    await handleShare()
+    setTimeout(() => setShareStatus(''), 2000)
+  }
 
   const handleSubmitReview = async (e) => {
     e.preventDefault()
@@ -84,6 +137,26 @@ export default function GunDetail({ gun, onBack, onEdit, onDelete }) {
 
           <div className="detail-actions">
             <FavoriteButton gunId={gun.id || gun.name} />
+
+            {/* ---- Tombol Share Link ---- */}
+            {/* Tampil hanya jika produk punya ID (bukan local-only) */}
+            {gun.id && (
+              <button
+                type="button"
+                className={`btn btn--outline share-btn${shareStatus ? ' share-btn--done' : ''}`}
+                onClick={triggerShare}
+                title="Bagikan link produk ini"
+              >
+                {shareStatus === 'copied' ? (
+                  <><Check size={16} /> Link Tersalin!</>
+                ) : shareStatus === 'shared' ? (
+                  <><Check size={16} /> Dibagikan!</>
+                ) : (
+                  <><Share2 size={16} /> Share</>
+                )}
+              </button>
+            )}
+
             {onEdit && (
               <button type="button" className="btn btn--outline" onClick={() => onEdit(gun)}>
                 Edit

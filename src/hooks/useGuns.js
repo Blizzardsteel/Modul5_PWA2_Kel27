@@ -2,11 +2,25 @@ import { useState, useEffect, useCallback } from 'react'
 import gunService from '../services/gunService'
 
 // ---------------------------------------------------------------------------
+// Query Cache — module-level Map agar persisten sepanjang sesi browser.
+// Key  : JSON.stringify(params)
+// Value: { data, pagination, timestamp }
+// ---------------------------------------------------------------------------
+const queryCache = new Map()
+const CACHE_TTL = 5 * 60 * 1000 // 5 menit dalam milidetik
+
+// ---------------------------------------------------------------------------
 // useGuns — fetch the paginated / filtered product list from the API.
 //
+// Fitur Query Caching:
+//   Sebelum request ke API, hook mengecek apakah hasil query yang sama
+//   sudah ada di cache dan belum kedaluwarsa (< 5 menit). Jika ada,
+//   data langsung dipakai dari cache tanpa hit network.
+//
+//   Fungsi refetch() menghapus entry cache terlebih dahulu sehingga
+//   data selalu fresh setelah operasi CRUD (create / update / delete).
+//
 // Returns { guns, loading, error, pagination, refetch }.
-// When the API is unreachable the `error` string will be set and `guns`
-// will remain an empty array so the UI can show a proper error state.
 // ---------------------------------------------------------------------------
 
 export function useGuns(params = {}) {
@@ -15,10 +29,24 @@ export function useGuns(params = {}) {
   const [error, setError] = useState(null)
   const [pagination, setPagination] = useState(null)
 
-  // Serialise params so the effect re-runs when they change.
+  // Serialise params sebagai cache key dan effect dependency.
   const paramKey = JSON.stringify(params)
 
   const fetchGuns = useCallback(async () => {
+    // ---- Cek cache ----
+    const cached = queryCache.get(paramKey)
+    const now = Date.now()
+
+    if (cached && now - cached.timestamp < CACHE_TTL) {
+      // Cache hit: data masih segar, tidak perlu request API
+      setGuns(cached.data)
+      setPagination(cached.pagination)
+      setLoading(false)
+      setError(null)
+      return
+    }
+
+    // ---- Cache miss atau kedaluwarsa: fetch dari API ----
     try {
       setLoading(true)
       setError(null)
@@ -26,8 +54,18 @@ export function useGuns(params = {}) {
       const response = await gunService.getGuns(params)
 
       if (response.success) {
-        setGuns(response.data || [])
-        setPagination(response.pagination || null)
+        const data = response.data || []
+        const pag = response.pagination || null
+
+        setGuns(data)
+        setPagination(pag)
+
+        // Simpan hasil ke cache
+        queryCache.set(paramKey, {
+          data,
+          pagination: pag,
+          timestamp: Date.now(),
+        })
       } else {
         setError(response.message || 'Failed to fetch products.')
       }
@@ -44,7 +82,14 @@ export function useGuns(params = {}) {
     fetchGuns()
   }, [fetchGuns])
 
-  return { guns, loading, error, pagination, refetch: fetchGuns }
+  // refetch paksa — hapus cache entry lalu fetch ulang.
+  // Dipanggil setelah operasi CRUD agar data selalu fresh.
+  const refetch = useCallback(() => {
+    queryCache.delete(paramKey)
+    fetchGuns()
+  }, [paramKey, fetchGuns])
+
+  return { guns, loading, error, pagination, refetch }
 }
 
 // ---------------------------------------------------------------------------

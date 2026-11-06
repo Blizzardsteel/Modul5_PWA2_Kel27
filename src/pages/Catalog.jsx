@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react'
-import { RefreshCw, Plus, Loader, AlertCircle, PackageOpen } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { RefreshCw, Plus, Loader, AlertCircle, PackageOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useGuns } from '../hooks/useGuns'
 import GUNS_LOCAL from '../data/guns'
 import GunCard from '../components/gun/GunCard'
@@ -14,6 +14,9 @@ import {
   extractCategories,
 } from '../utils/helpers'
 
+// Jumlah produk yang ditampilkan per halaman
+const ITEMS_PER_PAGE = 8
+
 /**
  * Catalog page — the main product listing.
  *
@@ -21,7 +24,8 @@ import {
  *   1. Live API via useGuns()
  *   2. Local static array (GUNS_LOCAL) when the API is unreachable
  *
- * Features: search, category filter, sort, CRUD actions, detail modal.
+ * Features: search, category filter, sort, CRUD actions, detail modal,
+ *           client-side pagination.
  */
 export default function Catalog({ onNavigate }) {
   // ---- API data ----
@@ -51,6 +55,25 @@ export default function Catalog({ onNavigate }) {
     )
     return sortItems(result, sortKey, sortOrder)
   }, [rawGuns, search, activeCategory, sortKey, sortOrder])
+
+  // ---- Paginasi ----
+  // currentPage menyimpan nomor halaman aktif (mulai dari 1).
+  // Setiap kali filter / search / sort berubah, reset ke halaman 1
+  // agar pengguna tidak terjebak di halaman yang sudah tidak ada isinya.
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const totalPages = Math.max(1, Math.ceil(filteredGuns.length / ITEMS_PER_PAGE))
+
+  // Reset ke halaman 1 saat filter berubah
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, activeCategory, sortKey, sortOrder])
+
+  // Ambil slice produk untuk halaman aktif
+  const paginatedGuns = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE
+    return filteredGuns.slice(start, start + ITEMS_PER_PAGE)
+  }, [filteredGuns, currentPage])
 
   // ---- detail view ----
   const [selectedGun, setSelectedGun] = useState(null)
@@ -163,10 +186,10 @@ export default function Catalog({ onNavigate }) {
           </div>
         )}
 
-        {/* Product grid */}
-        {filteredGuns.length > 0 && (
+        {/* Product grid — hanya tampilkan produk di halaman aktif */}
+        {paginatedGuns.length > 0 && (
           <ul className="stock">
-            {filteredGuns.map((gun) => (
+            {paginatedGuns.map((gun) => (
               <GunCard
                 key={gun.id || gun.name}
                 gun={gun}
@@ -176,6 +199,56 @@ export default function Catalog({ onNavigate }) {
               />
             ))}
           </ul>
+        )}
+
+        {/* ---- Kontrol Paginasi ---- */}
+        {/* Hanya tampil jika ada lebih dari satu halaman */}
+        {!loading && totalPages > 1 && (
+          <div className="pagination-wrap">
+            {/* Info halaman */}
+            <p className="pagination-info">
+              Halaman <strong>{currentPage}</strong> dari <strong>{totalPages}</strong>
+              {' '}({filteredGuns.length} produk)
+            </p>
+
+            <div className="pagination">
+              {/* Tombol Prev — disabled di halaman pertama */}
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={() => setCurrentPage((p) => p - 1)}
+                disabled={currentPage === 1}
+                aria-label="Halaman sebelumnya"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              {/* Tombol nomor halaman */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  type="button"
+                  className={`btn btn--sm${page === currentPage ? ' btn--primary' : ' btn--outline'}`}
+                  onClick={() => setCurrentPage(page)}
+                  aria-label={`Halaman ${page}`}
+                  aria-current={page === currentPage ? 'page' : undefined}
+                >
+                  {page}
+                </button>
+              ))}
+
+              {/* Tombol Next — disabled di halaman terakhir */}
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={() => setCurrentPage((p) => p + 1)}
+                disabled={currentPage === totalPages}
+                aria-label="Halaman berikutnya"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
         )}
 
         {useLocal && (
